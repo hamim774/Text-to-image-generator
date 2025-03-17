@@ -1,0 +1,240 @@
+"use client";
+import React from "react";
+
+function MainComponent() {
+  const [prompt, setPrompt] = useState("");
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [downloadStarted, setDownloadStarted] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!prompt.trim()) {
+      setError("Please enter a prompt");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/integrations/stable-diffusion-v-3/?prompt=${encodeURIComponent(
+          prompt
+        )}`
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Failed to generate image: [${response.status}] ${response.statusText}`
+        );
+      }
+      const data = await response.json();
+      setImage(data.data[0]);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to generate image. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!image) return;
+
+    try {
+      const response = await fetch(image);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      link.download = `generated-image-${timestamp}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setDownloadStarted(true);
+      setTimeout(() => setDownloadStarted(false), 2000);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to download image");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white font-inter">
+            Turn your words into art
+          </h1>
+          <p className="text-gray-700 dark:text-gray-300 font-inter">
+            Enter a description and watch your imagination come to life
+          </p>
+        </div>
+        <div className="space-y-4">
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe the image you want to create..."
+            className="w-full h-32 p-4 rounded-lg border border-gray-200 dark:border-gray-700 
+                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-inter
+                     focus:outline-none focus:border-gray-900 dark:focus:border-gray-500"
+            disabled={loading}
+          />
+
+          {error && (
+            <div className="text-red-500 font-inter text-sm">{error}</div>
+          )}
+
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !prompt.trim()}
+            className="w-full md:w-auto px-6 py-3 bg-gray-900 dark:bg-gray-800 
+                     text-white font-inter rounded hover:bg-gray-700 
+                     dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <i className="fas fa-circle-notch fa-spin mr-2"></i>
+                Generating...
+              </span>
+            ) : (
+              "Generate Image"
+            )}
+          </button>
+        </div>
+
+        <div
+          className="min-h-[300px] rounded-lg border border-gray-200 
+                      dark:border-gray-700 p-4 flex items-center justify-center overflow-hidden relative"
+        >
+          {loading ? (
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              <div
+                className="relative w-64 h-64 bg-gray-800 rounded-lg mb-4 overflow-hidden"
+                style={{
+                  animation: "glitch 0.5s ease-in-out infinite",
+                }}
+              >
+                <div
+                  className="absolute inset-0 bg-purple-500/30"
+                  style={{
+                    animation: "damage 2s ease-in-out infinite",
+                  }}
+                />
+                <div className="h-full w-full flex items-center justify-center">
+                  <p className="text-white font-inter text-lg animate-pulse">
+                    Processing your image...
+                  </p>
+                </div>
+              </div>
+              <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-500"
+                  style={{
+                    animation: "progress 2s ease-in-out infinite",
+                  }}
+                />
+              </div>
+            </div>
+          ) : image ? (
+            <div className="space-y-4 w-full">
+              <img
+                src={image}
+                alt="Generated artwork"
+                className="rounded-lg max-w-full h-auto"
+              />
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleDownload}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 
+                text-white font-inter rounded-lg transition-colors
+                flex items-center space-x-2 transform hover:scale-105
+                transition-transform duration-200"
+                >
+                  <i className="fas fa-download mr-2"></i>
+                  {downloadStarted ? "Download Started!" : "Download Image"}
+                </button>
+                {downloadStarted && (
+                  <span className="text-green-500 font-inter animate-fade-out">
+                    <i className="fas fa-check mr-1"></i>
+                    Download started!
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center">
+              <i className="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-3"></i>
+              <p className="text-gray-500 dark:text-gray-400 font-inter">
+                Your generated image will appear here
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`
+        @keyframes glitch {
+          0% {
+            transform: translate(0);
+          }
+          20% {
+            transform: translate(-2px, 2px);
+          }
+          40% {
+            transform: translate(-2px, -2px);
+          }
+          60% {
+            transform: translate(2px, 2px);
+          }
+          80% {
+            transform: translate(2px, -2px);
+          }
+          100% {
+            transform: translate(0);
+          }
+        }
+
+        @keyframes progress {
+          from {
+            width: 0%;
+          }
+          to {
+            width: 100%;
+          }
+        }
+
+        @keyframes damage {
+          0% {
+            opacity: 1;
+            clip-path: inset(0 0 0 0);
+          }
+          20% {
+            clip-path: inset(20% 0 20% 0);
+          }
+          40% {
+            clip-path: inset(40% 0 40% 0);
+          }
+          60% {
+            clip-path: inset(60% 0 60% 0);
+          }
+          80% {
+            clip-path: inset(80% 0 80% 0);
+          }
+          100% {
+            opacity: 1;
+            clip-path: inset(0 0 0 0);
+          }
+        }
+
+        @keyframes fade-out {
+          0% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export default MainComponent;
